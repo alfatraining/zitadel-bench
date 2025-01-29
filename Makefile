@@ -9,6 +9,15 @@ build:
 run:
 	go run github.com/alfatraining/zitadel-bench/cmd/cli
 
+k6s-variables:
+	@ echo "###"
+	@ echo "export ZITADEL_HOST=http://zitadel.127.0.0.1.nip.io:8080"
+	@ echo "export DURATION=120s"
+	@ echo "export VUS=$(USERS)"
+	@ echo "export ADMIN_LOGIN_NAME=dev@example.com"
+	@ echo "export ADMIN_PASSWORD=Password1!"
+	@ echo "###"
+
 benchmark-clients: build
 	docker network create zitadel || true
 	AUTHENTICATION_METHOD=$(AUTHENTICATION_METHOD) docker compose -f benchmark/clients/docker-compose.yml up --build -d

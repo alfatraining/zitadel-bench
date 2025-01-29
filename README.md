@@ -36,6 +36,21 @@ make benchmark-clients
 docker logs clients-zitcli-1 -f
 ```
 
+## 3-Node Cockroach Cluster + k6s
+
+Clone https://github.com/zitadel/zitadel to any location of your choice.
+
+```
+make benchmark-cockroach
+. <(make k6s-variables)
+git clone git@github.com:zitadel/zitadel.git github/zitadel/zitadel/
+cd github/zitadel/zitadel/load-test
+git checkout v2.67.2
+make ensure_modules
+make ensure_key_pair
+make human_password_login
+```
+
 ## Scaling Go CLI clients
 
 Run multiple Go CLI clients, depending on the `USERS` variable:
