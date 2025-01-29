@@ -1,0 +1,17 @@
+services:
+  zitcli:
+    deploy:
+      replicas: 1
+    build:
+      context: ../../cmd/cli/
+      dockerfile: ./Dockerfile
+    env_file: "../terraform/.env_${AUTHENTICATION_METHOD}"
+    command: /usr/local/bin/run.sh
+    external_links:
+      - "zitadel:zitadel.127.0.0.1.nip.io"
+    networks:
+      - "zitadel"
+
+networks:
+  zitadel:
+    external: true
