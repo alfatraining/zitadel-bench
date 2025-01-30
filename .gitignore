@@ -1,1 +1,5 @@
 cmd/cli/zitcli
+**.env*
+**/.terraform*
+**terraform.tfstate*
+github/**

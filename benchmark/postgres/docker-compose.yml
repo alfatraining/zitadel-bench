@@ -1,0 +1,119 @@
+services:
+  zitadel:
+    networks:
+      - "zitadel"
+    image: "ghcr.io/zitadel/zitadel:v2.67.2-debug"
+    command: "start-from-init --masterkey \"MasterkeyNeedsToHave32Characters\" --tlsMode disabled"
+    environment:
+      - "ZITADEL_DATABASE_POSTGRES_MAXOPENCONNS=40"
+      - "ZITADEL_DATABASE_POSTGRES_MAXIDLECONNS=30"
+      - "ZITADEL_DATABASE_POSTGRES_MAXCONNLIFETIME=10m"
+      - "ZITADEL_DATABASE_POSTGRES_MAXCONNIDLETIME=1m"
+      - "ZITADEL_DATABASE_POSTGRES_HOST=postgres"
+      - "ZITADEL_DATABASE_POSTGRES_PORT=5432"
+      - "ZITADEL_DATABASE_POSTGRES_DATABASE=zitadel"
+      - "ZITADEL_DATABASE_POSTGRES_USER_USERNAME=zitadel"
+      - "ZITADEL_DATABASE_POSTGRES_USER_PASSWORD=zitadel"
+      - "ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=disable"
+      - "ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME=postgres"
+      - "ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD=postgres"
+      - "ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE=disable"
+      - "ZITADEL_EXTERNALSECURE=false"
+      - "ZITADEL_EXTERNALDOMAIN=zitadel.127.0.0.1.nip.io"
+      - "ZITADEL_FIRSTINSTANCE_ORG_NAME=administration"
+      - "ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD=Password1!"
+      - "ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED=false"
+      - "ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_ADDRESS=dev@example.com"
+      - "ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED=true"
+      - "ZITADEL_FIRSTINSTANCE_MACHINEKEYPATH=/zitadel-machine-key/service-account-key.json"
+      - "ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME=zitadel-admin-sa"
+      - "ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME=Admin"
+      - "ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINEKEY_TYPE=1" # type 1 is JSON
+      - "ZITADEL_METRICS_TYPE=otel"
+      # - "ZITADEL_TRACING_TYPE=otel" # TODO: Add for tracing
+      # - "ZITADEL_TRACING_ENDPOINT=tempo:4317" # TODO: Add for tracing
+      - "ZITADEL_SYSTEMDEFAULTS_PASSWORDHASHER_HASHER_ALGORITHM=bcrypt"
+      - "ZITADEL_SYSTEMDEFAULTS_PASSWORDHASHER_HASHER_COST=12" # default=14
+      # - "ZITADEL_SYSTEMDEFAULTS_PASSWORDHASHER_HASHER_ALGORITHM=argon2id"
+      # - "ZITADEL_SYSTEMDEFAULTS_PASSWORDHASHER_HASHER_TIME=1" # default=3
+      # - "ZITADEL_SYSTEMDEFAULTS_PASSWORDHASHER_HASHER_MEMORY=47104" # default=32768
+      # - "ZITADEL_SYSTEMDEFAULTS_PASSWORDHASHER_HASHER_THREADS=1" # default=4
+      - "ZITADEL_SYSTEMDEFAULTS_SECRETHASHER_HASHER_ALGORITHM=bcrypt"
+      - "ZITADEL_SYSTEMDEFAULTS_SECRETHASHER_HASHER_COST=12" # default=4
+      # - "ZITADEL_SYSTEMDEFAULTS_SECRETHASHER_HASHER_ALGORITHM=argon2id"
+      # - "ZITADEL_SYSTEMDEFAULTS_SECRETHASHER_HASHER_TIME=1" #  default=3
+      # - "ZITADEL_SYSTEMDEFAULTS_SECRETHASHER_HASHER_MEMORY=47104" # default=32768
+      # - "ZITADEL_SYSTEMDEFAULTS_SECRETHASHER_HASHER_THREADS=1" # default=4``
+    mem_limit: "1g"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: "ZITADEL_TLS_ENABLED=false zitadel ready"
+      interval: "10s"
+      timeout: "10s"
+      retries: 10
+      start_period: "30s"
+    depends_on:
+      postgres:
+        condition: "service_healthy"
+    volumes:
+      - "zitadel-machine-key:/zitadel-machine-key"
+  permissions:
+    restart: "no"
+    image: "debian:bookworm-slim"
+    entrypoint:
+      - "/bin/bash"
+      - "-c"
+      - "chmod -R 777 /terraform; ls -lah /terraform; chmod -R 777 /zitadel-machine-key; ls -lah /zitadel-machine-key"
+    volumes:
+      - "../terraform:/terraform"
+      - "zitadel-machine-key:/zitadel-machine-key"
+    networks:
+      - "zitadel"
+  terraform:
+    restart: "no"
+    image: "hashicorp/terraform:latest"
+    environment:
+      - TF_VAR_concurrency=${TF_VAR_concurrency}
+    depends_on:
+      zitadel:
+        condition: "service_healthy"
+    volumes:
+      - "../terraform:/terraform"
+      - "zitadel-machine-key:/zitadel-machine-key"
+    working_dir: "/terraform"
+    entrypoint: "/terraform/terraform.sh"
+    links:
+      - "zitadel:zitadel.127.0.0.1.nip.io"
+    networks:
+      - "zitadel"
+  postgres:
+    image: "postgres:16"
+    user: "postgres"
+    environment:
+      - "POSTGRES_USER=postgres"
+      - "POSTGRES_PASSWORD=postgres"
+    mem_limit: "2g"
+    ports:
+      - "5432:5432"
+    networks:
+      - "zitadel"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready"
+        - "-d"
+        - "zitadel"
+        - "-U"
+        - "postgres"
+      interval: "2s"
+      timeout: "30s"
+      retries: 10
+      start_period: "3s"
+
+networks:
+  zitadel:
+    external: true
+volumes:
+  tfdata:
+  zitadel-machine-key:
